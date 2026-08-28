@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hashtag 資料抓取工具</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --border: #e2e5ea;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --error: #dc2626;
+    --success: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 14px; color: var(--text); }
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    margin-top: 12px;
+  }
+  label:first-of-type { margin-top: 0; }
+  input[type=text], input[type=password], input[type=date], input[type=number], select {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+    color: var(--text);
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > div { flex: 1 1 200px; }
+  .hashtag-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .platform-toggle { display: flex; gap: 8px; }
+  .platform-toggle button {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .platform-toggle button.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  button.primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 18px;
+  }
+  button.primary:hover { background: var(--accent-hover); }
+  button.primary:disabled { background: #9ca3af; cursor: not-allowed; }
+  button.secondary {
+    background: #fff;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .status { font-size: 13px; margin-top: 10px; min-height: 18px; }
+  .status.error { color: var(--error); }
+  .status.success { color: var(--success); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left;
+    border-bottom: 2px solid var(--border);
+    padding: 8px 6px;
+    color: var(--muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tbody tr:hover { background: #fafbfc; }
+  .content-cell { max-width: 360px; }
+  .content-text { white-space: pre-wrap; word-break: break-word; }
+  .content-text.truncated {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .expand-link { color: var(--accent); cursor: pointer; font-size: 12px; display: inline-block; margin-top: 4px; }
+  .table-wrap { overflow-x: auto; }
+  .top-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+  .count-badge { font-size: 13px; color: var(--muted); }
+  .note {
+    font-size: 12px;
+    color: var(--muted);
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 14px;
+    line-height: 1.6;
+  }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Hashtag 資料抓取工具</h1>
+  <div class="subtitle">自己填 Apify Token，選平台、Hashtag、日期區間，抓完可匯出 CSV。所有設定都留在你自己的瀏覽器裡，不會送到任何第三方伺服器（除了 Apify 本身）。</div>
+
+  <div class="card">
+    <h2>1. Apify 設定</h2>
+    <label for="apifyToken">Apify API Token</label>
+    <input type="password" id="apifyToken" placeholder="apify_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+
+    <label for="perHashtagLimit">每個 Hashtag 抓幾筆（越多越能涵蓋到指定日期區間，但也越花額度）</label>
+    <input type="number" id="perHashtagLimit" value="50" min="5" max="200">
+
+    <div class="note">Token 只存在你這台瀏覽器的 localStorage，不會被記錄或傳到別的地方；換一台裝置要重新輸入。</div>
+  </div>
+
+  <div class="card">
+    <h2>2. 平台</h2>
+    <div class="platform-toggle">
+      <button type="button" id="btnIG" class="active" onclick="setPlatform('instagram')">Instagram</button>
+      <button type="button" id="btnThreads" onclick="setPlatform('threads')">Threads</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. Hashtag（最多 5 個，不用打 # 符號）</h2>
+    <div class="hashtag-grid">
+      <input type="text" class="tag-input" placeholder="Hashtag 1">
+      <input type="text" class="tag-input" placeholder="Hashtag 2">
+      <input type="text" class="tag-input" placeholder="Hashtag 3">
+      <input type="text" class="tag-input" placeholder="Hashtag 4">
+      <input type="text" class="tag-input" placeholder="Hashtag 5">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>4. 日期區間（用貼文時間過濾，篩選在網頁端進行，不是 Apify 原生支援）</h2>
+    <div class="row">
+      <div>
+        <label for="dateFrom">從</label>
+        <input type="date" id="dateFrom">
+      </div>
+      <div>
+        <label for="dateTo">到</label>
+        <input type="date" id="dateTo">
+      </div>
+    </div>
+    <div class="note">留空＝不限制日期，顯示這次抓到的全部資料。若篩選後筆數很少，代表這個 Hashtag 在這段期間內的貼文本來就不多，可以試著調高上方「每個 Hashtag 抓幾筆」。</div>
+  </div>
+
+  <button class="primary" id="fetchBtn" onclick="runFetch()">開始抓取</button>
+  <div class="status" id="status"></div>
+
+  <div class="card" id="resultsCard" style="display:none;">
+    <div class="top-actions">
+      <div class="count-badge" id="countBadge"></div>
+      <button class="secondary" onclick="exportCsv()">匯出 CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>來源</th><th>Hashtag</th><th>帳號</th><th>時間</th><th>內容</th><th>讚數</th><th>留言/回覆</th><th>連結</th></tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let platform = 'instagram';
+let currentRows = [];
+
+function setPlatform(p) {
+  platform = p;
+  document.getElementById('btnIG').classList.toggle('active', p === 'instagram');
+  document.getElementById('btnThreads').classList.toggle('active', p === 'threads');
+}
+
+function getHashtags() {
+  return Array.from(document.querySelectorAll('.tag-input'))
+    .map(function (el) { return el.value.trim().replace(/^#/, ''); })
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
+function setStatus(text, kind) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+function saveToken(token) {
+  try { localStorage.setItem('hashtag_tool_apify_token', token); } catch (e) {}
+}
+function loadToken() {
+  try { return localStorage.getItem('hashtag_tool_apify_token') || ''; } catch (e) { return ''; }
+}
+window.addEventListener('DOMContentLoaded', function () {
+  const saved = loadToken();
+  if (saved) document.getElementById('apifyToken').value = saved;
+});
+
+async function runFetch() {
+  const token = document.getElementById('apifyToken').value.trim();
+  const hashtags = getHashtags();
+  const perLimit = parseInt(document.getElementById('perHashtagLimit').value, 10) || 50;
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo = document.getElementById('dateTo').value;
+
+  if (!token) { setStatus('請先填 Apify Token', 'error'); return; }
+  if (hashtags.length === 0) { setStatus('請至少填一個 Hashtag', 'error'); return; }
+
+  saveToken(token);
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  setStatus('抓取中，請稍候…（Apify 同步端點視資料量可能需要 10~60 秒）');
+
+  try {
+    const actor = platform === 'instagram'
+      ? 'apify~instagram-hashtag-scraper'
+      : 'logical_scrapers~threads-hashtag-scraper';
+
+    const payload = platform === 'instagram'
+      ? { hashtags: hashtags, resultsType: 'posts', resultsLimit: perLimit }
+      : { hashtags: hashtags, maxPosts: perLimit };
+
+    const res = await fetch('https://api.apify.com/v2/acts/' + actor + '/run-sync-get-dataset-items?token=' + encodeURIComponent(token), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error('Apify 回應錯誤 (' + res.status + ')：' + errText.slice(0, 300));
+    }
+
+    const items = await res.json();
+    let rows = items.map(normalizeItem).filter(Boolean);
+
+    if (dateFrom) {
+      const fromTs = new Date(dateFrom + 'T00:00:00').getTime();
+      rows = rows.filter(function (r) { return r.tsMillis === null || r.tsMillis >= fromTs; });
+    }
+    if (dateTo) {
+      const toTs = new Date(dateTo + 'T23:59:59').getTime();
+      rows = rows.filter(function (r) { return r.tsMillis === null || r.tsMillis <= toTs; });
+    }
+
+    rows.sort(function (a, b) { return (b.tsMillis || 0) - (a.tsMillis || 0); });
+
+    currentRows = rows;
+    renderResults(rows, items.length);
+    setStatus('完成，共抓到 ' + items.length + ' 筆原始資料，過濾後顯示 ' + rows.length + ' 筆。', 'success');
+  } catch (err) {
+    setStatus('失敗：' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function normalizeItem(item) {
+  if (platform === 'instagram') {
+    if (!item.url) return null;
+    const ts = item.timestamp ? Date.parse(item.timestamp) : null;
+    return {
+      source: 'Instagram',
+      hashtag: (item.hashtags || []).join(', '),
+      account: item.ownerUsername || '',
+      timeStr: item.timestamp ? new Date(item.timestamp).toLocaleString('zh-TW') : '',
+      tsMillis: ts,
+      content: item.caption || '',
+      likes: item.likesCount || 0,
+      comments: item.commentsCount || 0,
+      url: item.url
+    };
+  } else {
+    if (!item.url) return null;
+    const ts = item.published_on ? item.published_on * 1000 : null;
+    return {
+      source: 'Threads',
+      hashtag: item.hashtag || '',
+      account: item.username || '',
+      timeStr: ts ? new Date(ts).toLocaleString('zh-TW') : '',
+      tsMillis: ts,
+      content: item.text || '',
+      likes: item.like_count || 0,
+      comments: item.reply_count || 0,
+      url: item.url
+    };
+  }
+}
+
+function renderResults(rows, rawCount) {
+  const card = document.getElementById('resultsCard');
+  const body = document.getElementById('resultsBody');
+  const badge = document.getElementById('countBadge');
+  body.innerHTML = '';
+  badge.textContent = '共 ' + rows.length + ' 筆（原始抓到 ' + rawCount + ' 筆）';
+
+  rows.forEach(function (r, i) {
+    const tr = document.createElement('tr');
+    const isLong = r.content.length > 120;
+    tr.innerHTML =
+      '<td>' + escapeHtml(r.source) + '</td>' +
+      '<td>' + escapeHtml(r.hashtag) + '</td>' +
+      '<td>' + escapeHtml(r.account) + '</td>' +
+      '<td>' + escapeHtml(r.timeStr) + '</td>' +
+      '<td class="content-cell"><div class="content-text' + (isLong ? ' truncated' : '') + '" id="content-' + i + '">' + escapeHtml(r.content) + '</div>' +
+      (isLong ? '<span class="expand-link" onclick="toggleExpand(' + i + ')" id="expand-' + i + '">展開</span>' : '') + '</td>' +
+      '<td>' + r.likes + '</td>' +
+      '<td>' + r.comments + '</td>' +
+      '<td><a href="' + escapeHtml(r.url) + '" target="_blank" rel="noopener">開啟</a></td>';
+    body.appendChild(tr);
+  });
+
+  card.style.display = rows.length ? 'block' : 'none';
+}
+
+function toggleExpand(i) {
+  const el = document.getElementById('content-' + i);
+  const link = document.getElementById('expand-' + i);
+  const collapsed = el.classList.toggle('truncated');
+  link.textContent = collapsed ? '展開' : '收合';
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function exportCsv() {
+  if (!currentRows.length) return;
+  const headers = ['來源', 'Hashtag', '帳號', '時間', '內容', '讚數', '留言/回覆', '連結'];
+  const lines = [headers.join(',')];
+  currentRows.forEach(function (r) {
+    const cells = [r.source, r.hashtag, r.account, r.timeStr, r.content, r.likes, r.comments, r.url]
+      .map(function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/\n/g, ' ') + '"'; });
+    lines.push(cells.join(','));
+  });
+  const csv = '﻿' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'hashtag-data-' + platform + '-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
