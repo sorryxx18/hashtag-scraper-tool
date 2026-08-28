@@ -211,6 +211,22 @@
                 </div>
             </div>
 
+            <!-- Step 5: Required Keywords -->
+            <div class="mb-8">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="step-number w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm">5</div>
+                    <h2 class="text-xl font-bold text-gray-800">必要關鍵詞</h2>
+                    <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">選填</span>
+                </div>
+                <div class="ml-11">
+                    <input type="text" id="requiredKeywords" placeholder="例如：分發,實習,焦慮,考試,職涯（用逗號分隔）" class="hashtag-input w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-primary bg-gray-50">
+                    <p class="mt-2 text-xs text-gray-500">
+                        <i class="fa-solid fa-circle-info mr-1"></i>
+                        貼文除了要符合上面的 hashtag，內文還要「至少出現其中一個」這裡填的關鍵詞才會保留（AND 邏輯）。留空＝不做這層篩選，維持只用 hashtag 篩選的結果。這是網頁端二次過濾，不是 Apify 原生支援，篩選依據是貼文文字內容，不是 hashtag 標籤本身。
+                    </p>
+                </div>
+            </div>
+
             <!-- Action Button -->
             <div class="ml-11">
                 <button
@@ -398,6 +414,14 @@
                     const toTs = new Date(dateTo + 'T23:59:59').getTime();
                     rows = rows.filter(r => r.tsMillis === null || r.tsMillis <= toTs);
                 }
+
+                const requiredKeywords = document.getElementById('requiredKeywords').value
+                    .split(',').map(k => k.trim()).filter(Boolean);
+                if (requiredKeywords.length > 0) {
+                    log(`🔎 套用必要關鍵詞篩選：${requiredKeywords.join('、')}（符合其中之一即可）`);
+                    rows = rows.filter(r => requiredKeywords.some(k => (r.content || '').includes(k)));
+                }
+
                 rows.sort((a, b) => (b.tsMillis || 0) - (a.tsMillis || 0));
 
                 currentRows = rows;
